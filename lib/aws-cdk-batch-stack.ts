@@ -3,70 +3,112 @@ import * as ec2 from "@aws-cdk/aws-ec2";
 import * as batch from "@aws-cdk/aws-batch";
 import * as ecs from "@aws-cdk/aws-ecs";
 import * as ecr from "@aws-cdk/aws-ecr";
-import * as config from "../config.json";
 import { Duration } from "@aws-cdk/core";
 
+// config
+import {
+  vpcName,
+  clusterArn,
+  memoryLimitMiB,
+  cpu,
+  maxvCpus,
+} from "../config.json";
+
+// TODO: 동작하는지 확인해봐야 함
+const PROJECT_NAME = __dirname.split("/")[__dirname.split("/").length - 2];
+
+// TODO: 이미 존재하는 경우 나중에...
+// -> repo 등 초기셋팅 npm 명령어 한개
+// -> 수정할 때 쓰는 npm 명령어 한개 만들어야 하나?!
 export class AwsCdkBatchStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const projectName = __dirname.split("/")[__dirname.split("/").length - 2];
-
     // VPC setting
     // 1. Using existing VPC
-    const vpc = ec2.Vpc.fromLookup(this, "getExistingVPC", {
-      vpcName: config.vpcName,
+    const vpc = ec2.Vpc.fromLookup(this, "readExistingVPC", {
+      vpcName,
     });
 
-    // ECS Cluster 생성
-    const cluster = ecs.Cluster.fromClusterArn(
+    // Fargate Compute Environment setting
+    const fargateEnvironment = new batch.ComputeEnvironment(
       this,
-      "getExistingCluster",
-      config.clusterArn
-    );
-
-    // Task definition
-    const fargateTaskDefinition = new ecs.FargateTaskDefinition(
-      this,
-      "makeNewTaskDefinition",
+      "createEnvironment",
       {
-        memoryLimitMiB: 512,
-        cpu: 256,
+        computeEnvironmentName: `${PROJECT_NAME}-compute-environment`,
+        computeResources: {
+          vpc,
+          maxvCpus,
+          type: batch.ComputeResourceType.FARGATE,
+        },
       }
     );
 
-    // TODO: 이미 존재하는 리포지토리이면, 이미지를 추가만 하고 싶고, 존재하지 않으면 리포지토리를 만들고 싶음.. trycatch? Cfn.output?
-    // ECR setting
-    let ecrRepo;
-    try {
-      ecrRepo = ecr.Repository.fromRepositoryName(
-        this,
-        "getExistingRepo",
-        projectName
-      );
-    } catch (error) {
-      // 1. Making repository
-      const repoName = new ecr.Repository(this, "makeRepo", {
-        repositoryName: projectName,
-      });
-      // 2. Adding lifecycle rule
-      repoName.addLifecycleRule({
-        tagPrefixList: ["lastest"],
-        maxImageAge: Duration.days(30),
-        maxImageCount: 999,
-      });
-      // 3. Getting repo made ready
-      ecrRepo = ecr.Repository.fromRepositoryName(
-        this,
-        "getEcrRepo",
-        projectName
-      );
-    }
-
-    // Add containers to a task definition
-    const container = fargateTaskDefinition.addContainer("AddContainer", {
-      containerName: "martin",
-      image: ecs.ContainerImage.fromEcrRepository(ecrRepo),
+    // Job Queue setting
+    const jobQueue = new batch.JobQueue(this, "createJobQueue", {
+      jobQueueName: `${PROJECT_NAME}-job-queue`,
+      computeEnvironments: [
+        {
+          computeEnvironment: fargateEnvironment,
+          order: 1,
+        },
+      ],
+      priority: 1,
     });
+
+    /* 
+      A Batch Job definition helps AWS Batch understand important details 
+      about how to run your application in the scope of a Batch Job. 
+      This involves key information like 
+      resource requirements, what containers to run, how the compute environment should be prepared, and more
+    */
+    // Job Definition
+    // 1. Reading repo made ready
+    const ecrRepo = ecr.Repository.fromRepositoryName(
+      this,
+      "readEcrRepo",
+      PROJECT_NAME
+    );
+    // 2. Making job
+    const job = new batch.JobDefinition(this, "createJobDefinition", {
+      container: {
+        image: new ecs.EcrImage(ecrRepo, "latest"),
+      },
+    });
+
+    // // 1. ECR setting
+    // const repo = new ecr.Repository(this, "createEcrRepository", {
+    //   repositoryName: PROJECT_NAME,
+    // });
+    // // 2. Adding lifecycle rule
+    // repo.addLifecycleRule({
+    //   tagPrefixList: ["latest"],
+    //   maxImageAge: Duration.days(30),
+    //   maxImageCount: 999,
+    // });
+
+    // // Task definition
+    // const fargateTaskDefinition = new ecs.FargateTaskDefinition(
+    //   this,
+    //   "createTaskDefinition",
+    //   {
+    //     memoryLimitMiB,
+    //     cpu,
+    //   }
+    // );
+
+    // // ECS Cluster setting
+    // // 1. Using existing Cluster
+    // const cluster = ecs.Cluster.fromClusterArn(
+    //   this,
+    //   "readExistingCluster",
+    //   clusterArn
+    // );
+
+    // // Add containers to a task definition
+    // const container = fargateTaskDefinition.addContainer("AddContainer", {
+    //   containerName: "martin",
+    //   image: ecs.ContainerImage.fromEcrRepository(ecrRepo),
+    // });
   }
 }

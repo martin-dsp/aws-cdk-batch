@@ -2,6 +2,11 @@
 
 blah blah --profile martin
 
+# Prerequisite
+
+- Existing VPC
+- Existing ECS Cluster
+
 # What must be considered
 
 - `테스트 가능` 어떻게 테스트 환경을 구분하게 할 것인가??

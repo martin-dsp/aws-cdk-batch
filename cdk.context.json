@@ -1,0 +1,36 @@
+{
+  "vpc-provider:account=268883436116:filter.tag:Name=orun-vpc:region=ap-northeast-2:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-066a78c83ebe03025",
+    "vpcCidrBlock": "10.0.0.0/16",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-0af4dde7c8ced0252",
+            "cidr": "10.0.1.0/24",
+            "availabilityZone": "ap-northeast-2a",
+            "routeTableId": "rtb-0feba0c8f6a4b46d0"
+          }
+        ]
+      },
+      {
+        "name": "Isolated",
+        "type": "Isolated",
+        "subnets": [
+          {
+            "subnetId": "subnet-0b5dc33c229cc4d09",
+            "cidr": "10.0.249.0/24",
+            "availabilityZone": "ap-northeast-2b",
+            "routeTableId": "rtb-055ff03bd0c2cd19d"
+          }
+        ]
+      }
+    ]
+  },
+  "acknowledged-issue-numbers": [
+    19836
+  ]
+}
