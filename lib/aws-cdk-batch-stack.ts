@@ -3,6 +3,7 @@ import * as ec2 from "@aws-cdk/aws-ec2";
 import * as batch from "@aws-cdk/aws-batch";
 import * as ecs from "@aws-cdk/aws-ecs";
 import * as ecr from "@aws-cdk/aws-ecr";
+import * as iam from "@aws-cdk/aws-iam";
 import { Duration } from "@aws-cdk/core";
 
 // config
@@ -10,7 +11,7 @@ import {
   vpcName,
   clusterArn,
   memoryLimitMiB,
-  cpu,
+  vcpus,
   maxvCpus,
 } from "../config.json";
 
@@ -40,6 +41,9 @@ export class AwsCdkBatchStack extends cdk.Stack {
           vpc,
           maxvCpus,
           type: batch.ComputeResourceType.FARGATE,
+          vpcSubnets: {
+            subnetType: ec2.SubnetType.PUBLIC,
+          },
         },
       }
     );
@@ -56,10 +60,10 @@ export class AwsCdkBatchStack extends cdk.Stack {
       priority: 1,
     });
 
-    /* 
-      A Batch Job definition helps AWS Batch understand important details 
-      about how to run your application in the scope of a Batch Job. 
-      This involves key information like 
+    /*
+      A Batch Job definition helps AWS Batch understand important details
+      about how to run your application in the scope of a Batch Job.
+      This involves key information like
       resource requirements, what containers to run, how the compute environment should be prepared, and more
     */
     // Job Definition
@@ -69,11 +73,22 @@ export class AwsCdkBatchStack extends cdk.Stack {
       "readEcrRepo",
       PROJECT_NAME
     );
-    // 2. Making job
+    // 2. Making iam role to run Fargate
+    const executionRole = new iam.Role(this, "createTaskExecutionRole", {
+      assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+      roleName: "ecsTaskExecutionRole",
+    });
+    // 3. Making job
     const job = new batch.JobDefinition(this, "createJobDefinition", {
+      jobDefinitionName: `${PROJECT_NAME}-job-definition`,
       container: {
         image: new ecs.EcrImage(ecrRepo, "latest"),
+        assignPublicIp: false,
+        vcpus,
+        memoryLimitMiB,
+        executionRole,
       },
+      platformCapabilities: [batch.PlatformCapabilities.FARGATE],
     });
 
     // // 1. ECR setting
