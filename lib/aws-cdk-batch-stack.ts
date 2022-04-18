@@ -4,7 +4,6 @@ import * as batch from "@aws-cdk/aws-batch";
 import * as ecs from "@aws-cdk/aws-ecs";
 import * as ecr from "@aws-cdk/aws-ecr";
 import * as iam from "@aws-cdk/aws-iam";
-import { Duration } from "@aws-cdk/core";
 
 // config
 import {
@@ -37,6 +36,11 @@ export class AwsCdkBatchStack extends cdk.Stack {
       "createEnvironment",
       {
         computeEnvironmentName: `${PROJECT_NAME}-compute-environment`,
+        serviceRole: iam.Role.fromRoleArn(
+          this,
+          "readExisitingServiceRole",
+          "arn:aws:iam::268883436116:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
+        ),
         computeResources: {
           vpc,
           maxvCpus,
@@ -44,6 +48,13 @@ export class AwsCdkBatchStack extends cdk.Stack {
           vpcSubnets: {
             subnetType: ec2.SubnetType.PUBLIC,
           },
+          securityGroups: [
+            ec2.SecurityGroup.fromSecurityGroupId(
+              this,
+              "readExistingSecurityGroup",
+              "sg-04519a4bb31587368"
+            ),
+          ],
         },
       }
     );
@@ -73,20 +84,28 @@ export class AwsCdkBatchStack extends cdk.Stack {
       "readEcrRepo",
       PROJECT_NAME
     );
+
     // 2. Making iam role to run Fargate
     const executionRole = new iam.Role(this, "createTaskExecutionRole", {
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
       roleName: "ecsTaskExecutionRole",
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AmazonECSTaskExecutionRolePolicy"
+        ),
+      ],
     });
+
     // 3. Making job
     const job = new batch.JobDefinition(this, "createJobDefinition", {
       jobDefinitionName: `${PROJECT_NAME}-job-definition`,
       container: {
         image: new ecs.EcrImage(ecrRepo, "latest"),
-        assignPublicIp: false,
+        assignPublicIp: true,
         vcpus,
         memoryLimitMiB,
         executionRole,
+        platformVersion: ecs.FargatePlatformVersion.VERSION1_4,
       },
       platformCapabilities: [batch.PlatformCapabilities.FARGATE],
     });
