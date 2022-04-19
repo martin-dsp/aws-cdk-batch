@@ -4,6 +4,8 @@ import * as batch from "@aws-cdk/aws-batch";
 import * as ecs from "@aws-cdk/aws-ecs";
 import * as ecr from "@aws-cdk/aws-ecr";
 import * as iam from "@aws-cdk/aws-iam";
+import * as events from "@aws-cdk/aws-events";
+import * as targets from "@aws-cdk/aws-events-targets";
 
 // config
 import {
@@ -12,6 +14,8 @@ import {
   memoryLimitMiB,
   vcpus,
   maxvCpus,
+  serviceRoleForBatchArn,
+  defaultSecurityGroup,
 } from "../config.json";
 
 // TODO: 동작하는지 확인해봐야 함
@@ -39,7 +43,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
         serviceRole: iam.Role.fromRoleArn(
           this,
           "readExisitingServiceRole",
-          "arn:aws:iam::268883436116:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch"
+          serviceRoleForBatchArn
         ),
         computeResources: {
           vpc,
@@ -52,7 +56,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
             ec2.SecurityGroup.fromSecurityGroupId(
               this,
               "readExistingSecurityGroup",
-              "sg-04519a4bb31587368"
+              defaultSecurityGroup
             ),
           ],
         },
@@ -97,7 +101,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
     });
 
     // 3. Making job
-    const job = new batch.JobDefinition(this, "createJobDefinition", {
+    const jobDefinition = new batch.JobDefinition(this, "createJobDefinition", {
       jobDefinitionName: `${PROJECT_NAME}-job-definition`,
       container: {
         image: new ecs.EcrImage(ecrRepo, "latest"),
@@ -108,6 +112,26 @@ export class AwsCdkBatchStack extends cdk.Stack {
         platformVersion: ecs.FargatePlatformVersion.VERSION1_4,
       },
       platformCapabilities: [batch.PlatformCapabilities.FARGATE],
+    });
+
+    // AWS EventBridge setting
+    const event = new events.Rule(this, "createNewRule", {
+      enabled: true,
+      eventBus: events.EventBus.fromEventBusName(
+        this,
+        "readExisitingEventBus",
+        "default"
+      ),
+      // FIXME: cron 스케줄 언제로 설정할지..
+      schedule: events.Schedule.cron({ minute: "1" }),
+      targets: [
+        new targets.BatchJob(
+          jobQueue.jobQueueArn,
+          jobQueue,
+          jobDefinition.jobDefinitionArn,
+          jobDefinition
+        ),
+      ],
     });
 
     // // 1. ECR setting
