@@ -117,12 +117,12 @@ export class AwsCdkBatchStack extends cdk.Stack {
     // AWS EventBridge setting
     const event = new events.Rule(this, "createNewRule", {
       enabled: true,
-      eventBus: events.EventBus.fromEventBusName(
-        this,
-        "readExisitingEventBus",
-        "default"
-      ),
-      // FIXME: cron 스케줄 언제로 설정할지..
+      // eventBus: events.EventBus.fromEventBusName(
+      //   this,
+      //   "readExisitingEventBus",
+
+      //   ),
+      // FIXME: cron 스케줄 언제로 설정할지.. customizing 해야되는데 어떤 식으로 바꿔볼까~
       schedule: events.Schedule.cron({ minute: "1" }),
       targets: [
         new targets.BatchJob(
