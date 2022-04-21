@@ -28,13 +28,13 @@ export class AwsCdkBatchStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // VPC setting
+    // AWS VPC setting
     // 1. Using existing VPC
     const vpc = ec2.Vpc.fromLookup(this, "readExistingVPC", {
       vpcName,
     });
 
-    // Fargate Compute Environment setting
+    // AWS Fargate Compute Environment setting
     const fargateEnvironment = new batch.ComputeEnvironment(
       this,
       "createEnvironment",
@@ -63,7 +63,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
       }
     );
 
-    // Job Queue setting
+    // AWS Job Queue setting
     const jobQueue = new batch.JobQueue(this, "createJobQueue", {
       jobQueueName: `${PROJECT_NAME}-job-queue`,
       computeEnvironments: [
@@ -75,13 +75,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
       priority: 1,
     });
 
-    /*
-      A Batch Job definition helps AWS Batch understand important details
-      about how to run your application in the scope of a Batch Job.
-      This involves key information like
-      resource requirements, what containers to run, how the compute environment should be prepared, and more
-    */
-    // Job Definition
+    // ERC setting
     // 1. Reading repo made ready
     const ecrRepo = ecr.Repository.fromRepositoryName(
       this,
@@ -89,7 +83,8 @@ export class AwsCdkBatchStack extends cdk.Stack {
       PROJECT_NAME
     );
 
-    // 2. Making iam role to run Fargate
+    // AWS IAM Role setting
+    // 1. Making iam role to run Fargate
     const executionRole = new iam.Role(this, "createTaskExecutionRole", {
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
       roleName: "ecsTaskExecutionRole",
@@ -99,8 +94,30 @@ export class AwsCdkBatchStack extends cdk.Stack {
         ),
       ],
     });
+    // 2. Making iam role to bind EventBridge with Job Queue
+    const jobRole = new iam.Role(this, "createEventBridgeAndJobQueueRole", {
+      assumedBy: new iam.ServicePrincipal("events.amazonaws.com"),
+      roleName: "eventBridgeAndJobQueueRole",
+      inlinePolicies: {
+        eventBridgeJobQueueRole: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              resources: ["*"],
+              actions: ["batch:SubmitJob"],
+              effect: iam.Effect.ALLOW,
+            }),
+          ],
+        }),
+      },
+    });
 
-    // 3. Making job
+    /*
+      A Batch Job definition helps AWS Batch understand important details
+      about how to run your application in the scope of a Batch Job.
+      This involves key information like
+      resource requirements, what containers to run, how the compute environment should be prepared, and more
+    */
+    // AWS Batch JobDefinition setting
     const jobDefinition = new batch.JobDefinition(this, "createJobDefinition", {
       jobDefinitionName: `${PROJECT_NAME}-job-definition`,
       container: {
@@ -109,6 +126,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
         vcpus,
         memoryLimitMiB,
         executionRole,
+        jobRole,
         platformVersion: ecs.FargatePlatformVersion.VERSION1_4,
       },
       platformCapabilities: [batch.PlatformCapabilities.FARGATE],
@@ -123,7 +141,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
 
       //   ),
       // FIXME: cron 스케줄 언제로 설정할지.. customizing 해야되는데 어떤 식으로 바꿔볼까~
-      schedule: events.Schedule.cron({ minute: "1" }),
+      schedule: events.Schedule.cron({}),
       targets: [
         new targets.BatchJob(
           jobQueue.jobQueueArn,
