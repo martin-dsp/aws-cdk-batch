@@ -89,25 +89,28 @@ export class AwsCdkBatchStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
       roleName: "ecsTaskExecutionRole",
       managedPolicies: [
+        // 기존에 존재하는 policy이기에 사용
         iam.ManagedPolicy.fromAwsManagedPolicyName(
           "service-role/AmazonECSTaskExecutionRolePolicy"
         ),
       ],
     });
-    // 2. Making iam role to bind EventBridge with Job Queue
+    // 2. Making a policy for iam role // 새로운 policy 생성
+    const eventBridgeJobQueuePolicy = new iam.PolicyDocument({
+      statements: [
+        new iam.PolicyStatement({
+          resources: ["*"],
+          actions: ["batch:SubmitJob"],
+          effect: iam.Effect.ALLOW,
+        }),
+      ],
+    });
+    // 3. Making iam role to bind EventBridge with Job Queue
     const jobRole = new iam.Role(this, "createEventBridgeAndJobQueueRole", {
       assumedBy: new iam.ServicePrincipal("events.amazonaws.com"),
-      roleName: "eventBridgeAndJobQueueRole",
+      roleName: "AmazonEventBridgeInvokeBatchJobQueueRole",
       inlinePolicies: {
-        eventBridgeJobQueueRole: new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement({
-              resources: ["*"],
-              actions: ["batch:SubmitJob"],
-              effect: iam.Effect.ALLOW,
-            }),
-          ],
-        }),
+        EventBridgeJobQueuePolicy: eventBridgeJobQueuePolicy,
       },
     });
 

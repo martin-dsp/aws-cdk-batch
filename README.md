@@ -19,5 +19,5 @@ blah blah --profile martin
 - `Git Commands` to make repo and push
 - `Secret Keys` Git Action 쓸 때 -> ECR에 어떻게 올리지? 필요한 정보는 어떻게 저장하지.. repo 만들 때 적용시킬 수 있을까? 그러면 커멘드를 따로 치지 않으면 또 저장해놔야 할텐데..
 - `Default setting` Default로 처리되어야 할 사항들에 대해서(VPC, repo, cluster, iam roles etc..)는 어떻게 미리 처리하고 trycatch 같은 문법을 쓸 수 있는지 등등 체크해보기
-- ``
+- `npm commands` 첫 배포시, npm run init 같은 명령어를 통해 repository를 만들고 git push를 할 시 모든 동작!!!
 - ``
