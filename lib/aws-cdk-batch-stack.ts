@@ -129,7 +129,7 @@ export class AwsCdkBatchStack extends cdk.Stack {
         vcpus,
         memoryLimitMiB,
         executionRole,
-        jobRole,
+        // jobRole,
         platformVersion: ecs.FargatePlatformVersion.VERSION1_4,
       },
       platformCapabilities: [batch.PlatformCapabilities.FARGATE],
@@ -141,7 +141,6 @@ export class AwsCdkBatchStack extends cdk.Stack {
       // eventBus: events.EventBus.fromEventBusName(
       //   this,
       //   "readExisitingEventBus",
-
       //   ),
       // FIXME: cron 스케줄 언제로 설정할지.. customizing 해야되는데 어떤 식으로 바꿔볼까~
       schedule: events.Schedule.cron({}),
@@ -150,9 +149,13 @@ export class AwsCdkBatchStack extends cdk.Stack {
           jobQueue.jobQueueArn,
           jobQueue,
           jobDefinition.jobDefinitionArn,
-          jobDefinition
+          jobDefinition,
+          {
+            jobName: "jobDrivenByEventbridge",
+          }
         ),
       ],
+      ruleName: "ruleForBatchJob",
     });
 
     // // 1. ECR setting
